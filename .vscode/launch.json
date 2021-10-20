@@ -1,0 +1,33 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Launch Current File",
+            "request": "launch",
+            "mainClass": "${file}"
+        },
+        {
+            "type": "java",
+            "name": "Launch TCPClient",
+            "cwd": "${workspaceFolder}/src",
+            "request": "launch",
+            "mainClass": "Client.TCPClient",
+            "projectName": "Skynett_de96f35a",
+            "console":"externalTerminal",
+            "args": "5000"
+        },
+        {
+            "type": "java",
+            "name": "Launch TCPServer",
+            "cwd": "${workspaceFolder}/src",
+            "request": "launch",
+            "mainClass": "Server.TCPServer",
+            "projectName": "Skynett_de96f35a",
+            "args": "5000 60 120"
+        }
+    ]
+}
