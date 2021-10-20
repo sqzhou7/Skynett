@@ -11,6 +11,8 @@ package Client;
 import java.net.*;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.HashMap;
+import java.util.Map;
 import java.io.*;
 
 
@@ -21,60 +23,72 @@ public class TCPClient {
     private static DataInputStream dataInputStream;
     private static DataOutputStream dataOutputStream;
     private static MessageListener listener;
+    private static Boolean listenerConnected = false;
     private static Boolean serverDown = false;
+    private static Map<String, Socket> privateChatSockets;
 
     /**
      * Seperate thread for listening message sent by other users
      */
     private static class MessageListener extends Thread {
-        private Socket messageSocket;
-        private int identityPort;
-        private DataInputStream dataInputStream;
-        private DataOutputStream dataOutputStream;
+        //private Socket messageSocket;
+        //private int identityPort;
+        //private DataInputStream dataInputStream;
+        //private DataOutputStream dataOutputStream;
 
-        MessageListener(int port) throws IOException {
-            identityPort = port;
-            messageSocket = new Socket(serverHost, serverPort);
+        MessageListener(int idPort, String host, int port) throws IOException {
+            //identityPort = idPort;
+            //messageSocket = new Socket(host, port);
         }
         
         @Override
         public void run() {
             super.run();
-            try {
+            /*try {
                 dataInputStream = new DataInputStream(messageSocket.getInputStream());
                 dataOutputStream = new DataOutputStream(messageSocket.getOutputStream());
             } catch (IOException e) {
                 e.printStackTrace();
-            }
+            }*/
 
             assert dataInputStream != null;
             assert dataOutputStream != null;
 
             // send the server the port number of the client main thread port for authentication
-            try {
+           /* try {
                 dataOutputStream.writeUTF("listen " + String.valueOf(identityPort));
                 dataOutputStream.flush();
+                // test the message sender
+                String message = (String) dataInputStream.readUTF();
+                assert message.equals("connected");
+                listenerConnected = true;
+                System.out.println(listenerConnected);
+
             } catch (EOFException e) {
                 System.out.println("===== Server is down, MessageListener is terminated. =====");
                 return;
             } catch (IOException e) {
                 System.out.println("===== Server is down, MessageListener is terminated. =====");
                 return;
-            }
+            }*/
 
             while (true) {
                 try {
                     String message = (String) dataInputStream.readUTF();
                     Character statusCode = message.charAt(0);
-                    if (statusCode == '1') {
-                        // main(interaction) thread has ended, message listener needs to end as well 
-                        System.out.println(statusCode);
-                        break;
-                    } else if (statusCode == '2') {
-                        // main thread is blocked(from reading input), need listener to print certain info and exit the whole program
-                        System.out.println(message.substring(1));
+                    if (statusCode == '0') {
+                        System.out.print(message.substring(1));
+                    } else if (statusCode == '1') {
+                        // exit the client
+                        System.out.print(message.substring(1));
                         System.exit(0);
-                    } else System.out.println(message.substring(1));
+                    } else if (statusCode == '2') {
+                        String[] segments = message.split("\\s+");
+                        String host = segments[2];
+                        int port = Integer.parseInt(segments[3]);
+                        String username = segments[1];
+                        privateChatSockets.put(username, new Socket(host, port));
+                    }
                 } catch (EOFException e) {
                     System.out.println("===== Server is down, MessageListener is terminated. =====");
                     break;
@@ -88,6 +102,8 @@ public class TCPClient {
         }
     }
 
+    
+
     public static void main(String[] args) throws IOException {
         if (args.length != 1) {
             System.out.println("===== Invalid parameter! The correct usage is: java TCPClient SERVER_PORT =====");
@@ -99,13 +115,19 @@ public class TCPClient {
 
         // define socket for client
         Socket clientSocket = new Socket(serverHost, serverPort);
-
+        
         // define DataInputStream instance which would be used to receive response from the server
         // define DataOutputStream instance which would be used to send message to the server
         dataInputStream = new DataInputStream(clientSocket.getInputStream());
         dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
+        listener = new MessageListener(clientSocket.getLocalPort(), serverHost, serverPort);
+        listener.start();
+        // first wait the listener to finish connecting with the server
 
-        
+        /*(while (!listenerConnected) {
+            System.out.println("?");
+        }*/
+
         // Upon connection and setup, prompt user to login by first sending a login request to the server
         sendServerMessage("login");
 
@@ -114,11 +136,11 @@ public class TCPClient {
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 
         while (!serverDown) {
-            String responseMessage = (String) dataInputStream.readUTF();
-            Character status = responseMessage.charAt(0);
+            //String responseMessage = (String) dataInputStream.readUTF();
+            //Character status = responseMessage.charAt(0);
 
             // print the msg without the command byte
-            System.out.print(responseMessage.substring(1));
+            /*System.out.print(responseMessage.substring(1));
             if (status == '0') {
                 if (listener == null) {
                     listener = new MessageListener(clientSocket.getLocalPort());
@@ -134,7 +156,9 @@ public class TCPClient {
             // case '2': exit the client
             else if (status == '2') {
                 return;
-            }
+            }*/
+            String message = reader.readLine();
+            sendServerMessage(message);
         }
 
         /*
