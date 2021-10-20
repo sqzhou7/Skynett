@@ -294,7 +294,7 @@ public class TCPServer {
                         System.out.println("[recv] broadcast request from user - " + clientID);
                         t.cancel();
                         String content = message.substring(commands[0].length() + 1);
-                        broadCast(userAccount, userAccount.getUsername() + ": " + content);
+                        broadCast(userAccount, userAccount.getUsername() + ": " + content + "\n");
                         
 
                     } else if (commands[0].equals("block")) {
@@ -306,6 +306,8 @@ public class TCPServer {
                         Account targetAct = yellowBook.get(username);
                         if (targetAct == null) {
                             sendClientMessage("0User \"" + username + "\"does not exist.\n");
+                        } else if (targetAct == userAccount) {
+                            sendClientMessage("0Error. Can not block yourself.\n"); 
                         } else {
                             userAccount.block(targetAct);
                         }
@@ -318,6 +320,8 @@ public class TCPServer {
                         Account targetAct = yellowBook.get(username);
                         if (targetAct == null) {
                             sendClientMessage("0User \"" + username + "\" does not exist.\n");
+                        } else if (targetAct == userAccount) {
+                            sendClientMessage("0Error. Can not unblock yourself.\n"); 
                         } else {
                             userAccount.unblock(targetAct);
                         }
@@ -429,7 +433,20 @@ public class TCPServer {
         }
 
         public void clientExit() {
-            clientAlive = false;
+            if (clientAlive) {
+                clientAlive = false;
+                cleanUp();
+            }
+        }
+
+        public void cleanUp() {
+            System.out.println("[recv] logout request from user - " + clientID);
+            // log out the user/account
+            userAccount.logout();
+            onlineThreads.remove(userAccount.getUsername());
+            //listenerChecklist.remove(clientPort);
+            //stopListener();
+            broadCast(userAccount, "System: " + userAccount.getUsername() + " has logged out.\n");
         }
 
         public Boolean isClientAlive() {
