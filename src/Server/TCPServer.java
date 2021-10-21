@@ -47,6 +47,7 @@ public class TCPServer {
         protected boolean clientAlive = false;
         private Account userAccount;
         private String clientID;
+        private String clientAddress;
         private int clientPort;
         private ClientMessageThread msgSender;
         protected DataInputStream dataInputStream;
@@ -86,7 +87,7 @@ public class TCPServer {
         public void run() {
             super.run();
             // get client Internet Address and port number
-            String clientAddress = clientSocket.getInetAddress().getHostAddress();
+            clientAddress = clientSocket.getInetAddress().getHostAddress();
             clientPort = clientSocket.getPort();
             clientID = "("+ clientAddress + ", " + clientPort + ")";
             //listenerChecklist.put(clientPort, this);
@@ -121,6 +122,8 @@ public class TCPServer {
                     // this message might be used for command, or answer for a question from the message sender trigger by another thread, i.e. another user
                     if (answerMode) {
                         answer = message;
+                        // exit answer mode
+                        answerMode = false;
                         continue;
                     }
 
@@ -344,11 +347,17 @@ public class TCPServer {
                                 sendClientMessage("0User \"" + username + "\" is offline.\n");
                             } else {
                                 // send the user an invitation for private messaging
-                                Boolean confirm = th.privateCall(userAccount.getUsername());
+                                String host = null;
+                                String port = null;
+                                Boolean confirm = th.privateCall(userAccount.getUsername(), host, port);
                                 if (confirm) {
-
+                                    // send back client '2' so that client knows that the other end has accepted the calling request
+                                    System.out.println("sending confirmation with " + th.getClientAddress() +" "+ th.getClientPort());
+                                    sendClientMessage("2 " + userAccount.getUsername() + " " + username + " " + th.getClientAddress() + " " + th.getClientPort());
                                 }
                             }
+
+
                         }
                     } else {
                         sendClientMessage("0Command \"" + commands[0] + "\" does not exist, use \"help\" to list all supported commands.\n");
@@ -392,14 +401,20 @@ public class TCPServer {
             msgSender.sendMessage(content);
         }
 
-        public Boolean privateCall(String username) {
-            // send the confirmation/invitation
-            sendClientMessage("System: " + username + " wants to have a private chat with you. Do you accept?(y/n): ");
+        public Boolean privateCall(String username, String host, String port) {
             // set the messaging mode to answerMode
             answerMode = true;
+            System.out.println("try to send invitation");
+            // send the confirmation/invitation
+            sendClientMessage("3System: " + username + " wants to have a private chat with you. Do you accept?(y/n): ");
             // wait for user to give the answer
-            while (answer == null) {}
-            return answer.equals("y");
+            while (answer == null) {
+                System.out.println("waiting");
+            }
+            String answerCopy = answer;
+            answer = null;
+            return (answerCopy.equals("y"));
+
         }
 
         public String acceptClientMessage() {
@@ -457,6 +472,13 @@ public class TCPServer {
             return clientID;
         }
         
+        public String getClientAddress() {
+            return clientAddress;
+        }
+
+        public int getClientPort() {
+            return clientPort;
+        }
         /*public void setSender(ClientThread s) {
             msgSender = s;
         }

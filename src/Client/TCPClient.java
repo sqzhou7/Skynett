@@ -23,9 +23,10 @@ public class TCPClient {
     private static DataInputStream dataInputStream;
     private static DataOutputStream dataOutputStream;
     private static MessageListener listener;
-    private static Boolean listenerConnected = false;
     private static Boolean serverDown = false;
-    private static Map<String, Socket> privateChatSockets;
+    private static Boolean answerMode = false;
+    private static String userName;
+    private static Map<String, DataOutputStream> privateChatOutputs;
 
     /**
      * Seperate thread for listening message sent by other users
@@ -33,12 +34,15 @@ public class TCPClient {
     private static class MessageListener extends Thread {
         //private Socket messageSocket;
         //private int identityPort;
-        //private DataInputStream dataInputStream;
+        private DataInputStream dataInputStream;
+        private Boolean serverListener;
         //private DataOutputStream dataOutputStream;
 
-        MessageListener(int idPort, String host, int port) throws IOException {
+        MessageListener(DataInputStream in, Boolean server) {
             //identityPort = idPort;
             //messageSocket = new Socket(host, port);
+            serverListener = server;
+            dataInputStream = in;
         }
         
         @Override
@@ -76,24 +80,41 @@ public class TCPClient {
                 try {
                     String message = (String) dataInputStream.readUTF();
                     Character statusCode = message.charAt(0);
+                    
                     if (statusCode == '0') {
+                        // plain message, no special operation
                         System.out.print(message.substring(1));
                     } else if (statusCode == '1') {
                         // exit the client
                         System.out.print(message.substring(1));
                         System.exit(0);
                     } else if (statusCode == '2') {
+                        // target user has accepted the private call
                         String[] segments = message.split("\\s+");
-                        String host = segments[2];
-                        int port = Integer.parseInt(segments[3]);
-                        String username = segments[1];
-                        privateChatSockets.put(username, new Socket(host, port));
+                        String host = segments[3];
+                        int port = Integer.parseInt(segments[4]);
+                        String targetUsername = segments[2];  // name of the target user (that this user is calling)
+                        System.out.print(targetUsername + "has accepted the private chat.\n");
+                        userName = segments[1];
+                        Socket privateSocket = new Socket(host, port);
+                        // create input stream for this socket
+                        DataInputStream privateInput = new DataInputStream(privateSocket.getInputStream());
+                        DataOutputStream privateOutput = new DataOutputStream(privateSocket.getOutputStream());
+                        privateChatOutputs.put(targetUsername, privateOutput);
+                        MessageListener privateListener = new MessageListener(privateInput, false);
+                        privateListener.start();
+                    } else if (statusCode == '3') {
+                        System.out.print(message.substring(1));
+                        // server request an answer from user, therefore enter answer mode
+                        answerMode = true;
                     }
                 } catch (EOFException e) {
-                    System.out.println("===== Server is down, MessageListener is terminated. =====");
+                    if (serverListener) System.out.println("===== Server is down, MessageListener is terminated. =====");
+                    else System.out.println("===== The chat is ended by the other side. =====");
                     break;
                 } catch (IOException e) {
-                    System.out.println("===== Server is down, MessageListener is terminated. =====");
+                    if (serverListener) System.out.println("===== Server is down, MessageListener is terminated. =====");
+                    else System.out.println("===== The chat is ended by the other side. =====");
                     break;
                 }
             }
@@ -120,7 +141,7 @@ public class TCPClient {
         // define DataOutputStream instance which would be used to send message to the server
         dataInputStream = new DataInputStream(clientSocket.getInputStream());
         dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
-        listener = new MessageListener(clientSocket.getLocalPort(), serverHost, serverPort);
+        listener = new MessageListener(dataInputStream, true);
         listener.start();
         // first wait the listener to finish connecting with the server
 
@@ -158,7 +179,25 @@ public class TCPClient {
                 return;
             }*/
             String message = reader.readLine();
-            sendServerMessage(message);
+
+            // if the command is to send private message, then no need to pass the request to server as server should not know the content of the chat
+            String[] commands = message.split("\\s+");
+            if (!answerMode && commands[0].equals("private")) {
+                // check if has established connection with the target user
+                String targetUser = commands[1];
+                String content = message.substring(commands[0].length() + commands[1].length() + 2);
+                DataOutputStream output = privateChatOutputs.get(targetUser);
+                try {
+                    output.writeUTF("0" + userName + ": " + content + "\n");
+                    output.flush();
+                } catch (EOFException e) {
+                    System.out.println("===== The chat is ended by the other side. =====");
+                } catch (IOException e) {
+                    System.out.println("===== The chat is ended by the other side. =====");
+                }
+            } else sendServerMessage(message);
+            // reset to command mode
+            answerMode = false;
         }
 
         /*
