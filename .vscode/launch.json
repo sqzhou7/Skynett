@@ -27,7 +27,7 @@
             "request": "launch",
             "mainClass": "Server.TCPServer",
             "projectName": "Skynett_de96f35a",
-            "args": "5000 60 120"
+            "args": "5000 60 1200"
         }
     ]
 }

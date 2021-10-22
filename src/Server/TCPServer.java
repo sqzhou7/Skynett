@@ -10,7 +10,9 @@
 
 package Server;
 import java.net.*;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.Timer;
@@ -27,7 +29,7 @@ public class TCPServer {
     private static Map<String, Account> yellowBook;
 
     // map between username and message memo for this user/account
-    private static Map<String, Message> memo;
+    private static Map<String, List<Message>> memo;
 
     // map between client's main thread port number and its serve-side main thread
     //private static Map<Integer, ClientThread> listenerChecklist;
@@ -152,9 +154,18 @@ public class TCPServer {
                                 int result = act.login(password);
                                 if (result == 0) {
                                     onlineThreads.put(username, this);
-                                    userAccount = act;
-                                    
+                                    userAccount = act;                                    
                                     sendClientMessage("0Login successful! Welcome to Skynet!\nPlease enter command below:\n");
+                                    
+                                    // push the memo if there is 
+                                    List<Message> messages = memo.get(username);
+                                    if (messages != null) {
+                                        for (Message m : messages) {
+                                            System.out.println(m.getContent());
+                                            sendClientMessage("0" + m.getSender() + ": " + m.getContent() + "\n");
+                                        }
+                                    }
+
                                     broadCast(userAccount, "System: " + userAccount.getUsername() + " has logged in.\n");
                                     break;
                                 } else if (result == 1) {
@@ -218,8 +229,21 @@ public class TCPServer {
                     } else if (commands[0].equals("message")) {
                         System.out.println("[recv] message request from user - " + clientID);
                         t.cancel();
+                        // check argument
+                        if (commands.length < 2) {
+                            sendClientMessage("Command usage: message receiver content\n");
+                            continue;
+                        }
+                        else if (commands.length <3) {
+                            sendClientMessage("Error: Message cannot be empty\n");
+                            continue;
+                        }
                         String receiver = commands[1];
-                        String content = message.substring(commands[0].length() + commands[1].length() + 2);
+                        String content = "";
+
+                        
+                        content = message.substring(commands[0].length() + commands[1].length() + 2);
+                       
                         // check if the user exist
                         Account act = yellowBook.get(receiver);
                         if (act == null) {
@@ -236,8 +260,16 @@ public class TCPServer {
                                 if (ct == null) {
                                     // user currently not online, create message memo
                                     Message newMemo = new Message(userAccount.getUsername(), receiver, content);
+                                    System.out.println("Add " + newMemo.getContent() + " into the memo");
                                     // associate this memo with the receiver username
-                                    memo.put(receiver, newMemo);
+                                    List<Message> messages = memo.get(receiver);
+                                    if (messages == null) {
+                                        messages = new ArrayList<>();
+                                        messages.add(newMemo);
+                                        memo.put(receiver, messages);
+                                    } else {
+                                        messages.add(newMemo);
+                                    }
                                 } else {
                                     ct.sendClientMessage("0" + userAccount.getUsername() + ": " + content + "\n");
                                 }
@@ -285,6 +317,7 @@ public class TCPServer {
                     } else if (commands[0].equals("whoelsesince")) {
                         System.out.println("[recv] whoelsesince request from user - " + clientID);
                         t.cancel();
+                        if (commands.length < 2) sendClientMessage("Command usage: whoelsesince window_size\n");
                         int period = Integer.parseInt(commands[1]);
                         String nameList = "0";
                         for (String user : onlineThreads.keySet()) {
@@ -296,6 +329,10 @@ public class TCPServer {
                     } else if (commands[0].equals("broadcast")) {
                         System.out.println("[recv] broadcast request from user - " + clientID);
                         t.cancel();
+                        if (commands.length < 2) {
+                            sendClientMessage("Command usage: broadcast content\n");
+                            continue;
+                        }
                         String content = message.substring(commands[0].length() + 1);
                         broadCast(userAccount, userAccount.getUsername() + ": " + content + "\n");
                         
@@ -303,6 +340,10 @@ public class TCPServer {
                     } else if (commands[0].equals("block")) {
                         System.out.println("[recv] block request from user - " + clientID);
                         t.cancel();
+                        if (commands.length < 2) {
+                            sendClientMessage("Command usage: block target_user\n");
+                            continue;
+                        }
                         // check the username
                         String username = message.substring(commands[0].length() + 1);
 
@@ -318,6 +359,10 @@ public class TCPServer {
                     } else if (commands[0].equals("unblock")) {
                         System.out.println("[recv] logout request from user - " + clientID);
                         t.cancel();
+                        if (commands.length < 2) {
+                            sendClientMessage("Command usage: unblock target_user\n");
+                            continue;
+                        }
                         // check the username
                         String username = message.substring(commands[0].length() + 1);
                         Account targetAct = yellowBook.get(username);
@@ -335,6 +380,10 @@ public class TCPServer {
                     } else if (commands[0].equals("startprivate")) {
                         System.out.println("[recv] startprivate request from user - " + clientID);
                         t.cancel();
+                        if (commands.length < 2) {
+                            sendClientMessage("Command usage: startprivate target_user\n");
+                            continue;
+                        }
                         // check the username
                         String username = message.substring(commands[0].length() + 1);
 
@@ -349,37 +398,22 @@ public class TCPServer {
                                 // send the user an invitation for private messaging
                                 String host = null;
                                 String port = null;
-                                Boolean confirm = th.privateCall(userAccount.getUsername(), host, port);
-                                if (confirm) {
+                                String confirm = th.privateCall(userAccount.getUsername(), host, port);
+                                if (!confirm.equals("-1")) {
                                     // send back client '2' so that client knows that the other end has accepted the calling request
-                                    System.out.println("sending confirmation with " + th.getClientAddress() +" "+ th.getClientPort());
-                                    sendClientMessage("2 " + userAccount.getUsername() + " " + username + " " + th.getClientAddress() + " " + th.getClientPort());
+                                    System.out.println("sending confirmation with " + th.getClientAddress() +" "+ confirm);
+                                    sendClientMessage("2 " + userAccount.getUsername() + " " + username + " " + th.getClientAddress() + " " + confirm);
+                                } else {
+                                    sendClientMessage("0" + username + " has rejected the private chat\n");
                                 }
                             }
-
-
                         }
-                    } else {
-                        sendClientMessage("0Command \"" + commands[0] + "\" does not exist, use \"help\" to list all supported commands.\n");
-                    }
+                    } else if (commands[0].equals("private")) {
+                        t.cancel();
+                    } else if (commands[0].equals("stopprivate")) {
+                        t.cancel();
+                    } else sendClientMessage("0Command \"" + commands[0] + "\" does not exist, enter \"help\" to list all supported commands.\n");
                     
-                    /*else if (commands[0].equals("download")) {
-                        System.out.println("[recv] download request from user - " + clientID);
-
-                        // make corresponding response
-                        String responseMessage = "You need to provide the file name you want to download";
-                        System.out.println("[send] " + responseMessage);
-                        dataOutputStream.writeUTF(responseMessage);
-                        dataOutputStream.flush();
-                    } else {
-                        System.out.println("[recv]  " + message + " from user - " + clientID);
-                        String responseMessage = "unknown request";
-                        System.out.println("[send] " + message);
-                        dataOutputStream.writeUTF(responseMessage);
-                        dataOutputStream.flush();
-                    }*/
-
-                    //sendClientMessage("0");
            
             }
         }
@@ -401,7 +435,8 @@ public class TCPServer {
             msgSender.sendMessage(content);
         }
 
-        public Boolean privateCall(String username, String host, String port) {
+        // return the port number of the other end, -1 if rejected
+        public String privateCall(String username, String host, String port) {
             // set the messaging mode to answerMode
             answerMode = true;
             System.out.println("try to send invitation");
@@ -409,12 +444,26 @@ public class TCPServer {
             sendClientMessage("3System: " + username + " wants to have a private chat with you. Do you accept?(y/n): ");
             // wait for user to give the answer
             while (answer == null) {
-                System.out.println("waiting");
+                System.out.println("waiting for acception");
             }
-            String answerCopy = answer;
+            System.out.println(answer);
+            String confirm = answer;
             answer = null;
-            return (answerCopy.equals("y"));
-
+            if (confirm.equals("y")) {
+                // find an available port number
+                answerMode = true;
+                sendClientMessage("4" + " " + userAccount.getUsername() + " " + username);
+                System.out.println("try to obtain the port number");
+                while (answer == null) {
+                    System.out.println("waiting for port number");
+                }
+                System.out.println(answer);
+                String portNum = answer;
+                answer = null;
+                return portNum;
+            } else {
+                return "-1";
+            }
         }
 
         public String acceptClientMessage() {
@@ -531,6 +580,7 @@ public class TCPServer {
         // fetch all the existing users from credentials.txt
         yellowBook = new ConcurrentHashMap<>();
         onlineThreads = new ConcurrentHashMap<>();
+        memo = new ConcurrentHashMap<>();
         //listenerChecklist = new ConcurrentHashMap<>();
         File credential = new File("Server/credentials.txt");
         Scanner myScanner = new Scanner(credential);
