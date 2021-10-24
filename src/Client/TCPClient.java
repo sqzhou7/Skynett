@@ -35,13 +35,15 @@ public class TCPClient {
         //private int identityPort;
         private DataInputStream dataInputStream;
         private Boolean serverListener;
+        private String userListento;
         //private DataOutputStream dataOutputStream;
 
-        MessageListener(DataInputStream in, Boolean server) {
+        MessageListener(DataInputStream in, Boolean server, String name) {
             //identityPort = idPort;
             //messageSocket = new Socket(host, port);
             serverListener = server;
             dataInputStream = in;
+            if (!serverListener) userListento = name;
         }
         
         @Override
@@ -99,7 +101,7 @@ public class TCPClient {
                         DataOutputStream privateOutput = new DataOutputStream(privateSocket.getOutputStream());
                         privateChatOutputs.put(targetUsername, privateOutput);
                         privateChatSockets.put(targetUsername, privateSocket);
-                        MessageListener privateListener = new MessageListener(privateInput, false);
+                        MessageListener privateListener = new MessageListener(privateInput, false, targetUsername);
                         privateListener.start(); 
                     } else if (statusCode == '4') {
                         String[] segments = message.split("\\s+");
@@ -115,7 +117,7 @@ public class TCPClient {
                         DataOutputStream privateOutput = new DataOutputStream(privateClient.getOutputStream());
                         privateChatOutputs.put(targetUsername, privateOutput);
                         privateChatSockets.put(targetUsername, privateClient);
-                        MessageListener privateListener = new MessageListener(privateInput, false);
+                        MessageListener privateListener = new MessageListener(privateInput, false, targetUsername);
                         privateListener.start(); 
                     } else if (statusCode == '3') {
                         System.out.print(message.substring(1));
@@ -128,17 +130,28 @@ public class TCPClient {
                         // remove the output
                         privateChatOutputs.remove(username);
                         // close the private connection
-                        privateChatSockets.get(username).close();
                         privateChatSockets.remove(username);
                         break;
                     }
                 } catch (EOFException e) {
                     if (serverListener) System.out.println("System: Server is down, MessageListener is terminated.");
-                    else System.out.println("System: Chat is ended");
+                    else {
+                        System.out.println("System: Chat is ended");
+                        // remove the bookkeeping
+                        privateChatOutputs.remove(userListento);
+                        // close the private connection
+                        privateChatSockets.remove(userListento);
+                    }
                     break;
                 } catch (IOException e) {
                     if (serverListener) System.out.println("System: Server is down, MessageListener is terminated.");
-                    else System.out.println("System: Chat is ended");
+                    else {
+                        System.out.println("System: Chat is ended");
+                        // remove the bookkeeping
+                        privateChatOutputs.remove(userListento);
+                        // close the private connection
+                        privateChatSockets.remove(userListento);
+                    }
                     break;
                 }
             }
@@ -165,7 +178,7 @@ public class TCPClient {
         // define DataOutputStream instance which would be used to send message to the server
         dataInputStream = new DataInputStream(clientSocket.getInputStream());
         dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
-        listener = new MessageListener(dataInputStream, true);
+        listener = new MessageListener(dataInputStream, true, null);
         listener.start();
         // first wait the listener to finish connecting with the server
 
