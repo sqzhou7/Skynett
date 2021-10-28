@@ -148,8 +148,8 @@ public class TCPServer {
                     if (act != null) {
                         // check password
                         int tryout = 3;
-                        sendClientMessage("0Password: ");
                         while (true) {
+                            sendClientMessage("0Password: ");
                             String password = acceptClientMessage();
                             int result = act.login(password);
                             if (result == 0) {
@@ -176,7 +176,7 @@ public class TCPServer {
                                     act.noticeLocked(lockDuration);
                                     System.out.println("User with userid " + clientID + " is locked due to multiple loggin failure.");
                                     break;
-                                } else sendClientMessage("0Password incorrect. You have " + tryout + " more chances to try.\nPassword: ");
+                                } else sendClientMessage("0Password incorrect. You have " + tryout + " more chances to try.\n");
                             } else if (result == 2) {
                                 sendClientMessage("1This account is already logged in.\n");
                                 break;
