@@ -1,12 +1,7 @@
 /*
- * Java multi-threading server with TCP
- * There are two points of this example code:
- * - socket programming with TCP e.g., how to define a server socket, how to exchange data between client and server
- * - multi-threading
- *
- * Author: Wei Song
- * Date: 2021-09-28
- * */
+ * Author: Shaoqian Zhou
+ * Date: Oct 2021
+ */
 
 package Server;
 import java.net.*;
@@ -25,14 +20,12 @@ public class TCPServer {
     // Server information
     private static ServerSocket serverSocket;
     private static Integer serverPort;
+
     // map between username and account
     private static Map<String, Account> yellowBook;
 
     // map between username and message memo for this user/account
     private static Map<String, List<Message>> memo;
-
-    // map between client's main thread port number and its serve-side main thread
-    //private static Map<Integer, ClientThread> listenerChecklist;
 
     // map between username and its client-thread
     private static Map<String, ClientThread> onlineThreads;
@@ -63,7 +56,7 @@ public class TCPServer {
             public void run() {
                 super.run();
                 while (clientAlive) {
-
+                    // infinite loop waiting to send message to the client
                 }
             }
 
@@ -88,11 +81,12 @@ public class TCPServer {
         @Override
         public void run() {
             super.run();
+
             // get client Internet Address and port number
             clientAddress = clientSocket.getInetAddress().getHostAddress();
             clientPort = clientSocket.getPort();
             clientID = "("+ clientAddress + ", " + clientPort + ")";
-            //listenerChecklist.put(clientPort, this);
+
             // start the message sender
             msgSender = new ClientMessageThread();
             msgSender.run();
@@ -106,9 +100,9 @@ public class TCPServer {
             dataInputStream = null;
             dataOutputStream = null;
             
+            // set up the input and output stream
             setupIO();
             
-
             while (clientAlive) {
                 
                 // get input from client
@@ -134,15 +128,13 @@ public class TCPServer {
                 if (commands[0].equals("login")) {
                     System.out.println("[recv] login request from user - " + clientID);
                     t.cancel();
-                    
-                    
+                      
                     // prompt the user to enter username
                     sendClientMessage("0Username: ");
 
                     // waiting for the username
                     String username = acceptClientMessage();
             
-                    
                     // check if the username exist
                     Account act = yellowBook.get(username);
                     if (act != null) {
@@ -155,7 +147,7 @@ public class TCPServer {
                             if (result == 0) {
                                 onlineThreads.put(username, this);
                                 userAccount = act;                                    
-                                sendClientMessage("0Login successful! Welcome to Skynet!\nPlease enter command below:\n");
+                                sendClientMessage("0Login successful! Welcome to Skynett!\nPlease enter command below:\n");
                                 
                                 // push the memo if there is 
                                 List<Message> messages = memo.get(username);
@@ -174,7 +166,7 @@ public class TCPServer {
                                     sendClientMessage("1Invalid Password. Your account is locked for " + lockDuration + " seconds. Please try again later\n");
                                     // lock the account
                                     act.noticeLocked(lockDuration);
-                                    System.out.println("User with userid " + clientID + " is locked due to multiple loggin failure.");
+                                    //System.out.println("User with userid " + clientID + " is locked due to multiple loggin failure.");
                                     break;
                                 } else sendClientMessage("0Password incorrect. You have " + tryout + " more chances to try.\n");
                             } else if (result == 2) {
@@ -215,7 +207,7 @@ public class TCPServer {
                             newAccount.login(password);
                             userAccount = newAccount;
                             onlineThreads.put(username, this);
-                            sendClientMessage("0Account created! You are logged in! Welcome to Skynet!\n");
+                            sendClientMessage("0Account created! You are logged in! Welcome to Skynett!\n");
                             broadCast(userAccount, "System: " + userAccount.getUsername() + " has logged in.\n");
                         } else {
                             sendClientMessage("1");
@@ -227,7 +219,7 @@ public class TCPServer {
                     // dataOutputStream would be used to send the data to client side
 
                 } else if (commands[0].equals("message")) {
-                    System.out.println("[recv] message request from user - " + clientID);
+                    //System.out.println("[recv] message request from user - " + clientID);
                     t.cancel();
                     // check argument
                     if (commands.length < 2) {
@@ -249,18 +241,18 @@ public class TCPServer {
                     if (act == null) {
                         sendClientMessage("0Error. User \"" + receiver + "\" does not exist.\n");
                     } else if (receiver.equals(userAccount.getUsername())) {
-                        sendClientMessage("0Error. Can not send message to yourself.\n");
+                        sendClientMessage("0Error. Cannot send message to yourself.\n");
                     } else {
                         // check if blocked
                         if (act.ifblocked(userAccount)) {
-                            sendClientMessage("0Error. Can not send message to this account.\n");
+                            sendClientMessage("0Sorry. Cannot send message to this account.\n");
                         } else {
                             // check if this user is online
                             ClientThread ct = onlineThreads.get(receiver);
                             if (ct == null) {
                                 // user currently not online, create message memo
                                 Message newMemo = new Message(userAccount.getUsername(), receiver, content);
-                                System.out.println("Add " + newMemo.getContent() + " into the memo");
+                                //System.out.println("Add " + newMemo.getContent() + " into the memo");
                                 // associate this memo with the receiver username
                                 List<Message> messages = memo.get(receiver);
                                 if (messages == null) {
@@ -284,27 +276,9 @@ public class TCPServer {
                     onlineThreads.remove(userAccount.getUsername());
                     //listenerChecklist.remove(clientPort);
                     //stopListener();
-                    sendClientMessage("1You are logged out! Thank you for using Skynet!\n");
+                    sendClientMessage("1You are logged out! Thank you for using Skynett!\n");
                     broadCast(userAccount, "System: " + userAccount.getUsername() + " has logged out.(1)\n");
                     break;
-                /*} else if (commands[0].equals("listen")) {
-                    // this is a listener thread from a client
-                    System.out.println("[recv] listen request from port - " + commands[1]);
-                    t.cancel();
-                    int portNum = Integer.parseInt(commands[1]);
-                    ClientThread mainThread = listenerChecklist.get(portNum);
-                    if (mainThread != null) {
-                        mainThread.setSender(this);
-                        sendMessage("connected");
-                        System.out.println("===== sender is connected, user ID: " + getClientID() + " =====");
-                    } else {
-                        System.out.println("===== sender is not connected, user ID: " + getClientID() + " =====");
-                        return;
-                    }
-
-                    while (clientAlive) {
-                        // wait for any message to be sent
-                    }*/
                 } else if (commands[0].equals("whoelse")) {
                     System.out.println("[recv] whoelse request from user - " + clientID);
                     t.cancel();
@@ -335,8 +309,6 @@ public class TCPServer {
                     }
                     String content = message.substring(commands[0].length() + 1);
                     broadCast(userAccount, userAccount.getUsername() + ": " + content + "\n");
-                    
-
                 } else if (commands[0].equals("block")) {
                     System.out.println("[recv] block request from user - " + clientID);
                     t.cancel();
@@ -355,7 +327,6 @@ public class TCPServer {
                     } else {
                         userAccount.block(targetAct);
                     }
-
                 } else if (commands[0].equals("unblock")) {
                     System.out.println("[recv] logout request from user - " + clientID);
                     t.cancel();
@@ -390,6 +361,8 @@ public class TCPServer {
                     Account targetAct = yellowBook.get(username);
                     if (targetAct == null) {
                         sendClientMessage("0User \"" + username + "\" does not exist.\n");
+                    } else if (targetAct.ifblocked(userAccount)) {
+                        sendClientMessage("0Sorry, cannot start private chat with this user.\n");
                     } else {
                         ClientThread th = onlineThreads.get(username);
                         if (th == null) {
@@ -415,8 +388,6 @@ public class TCPServer {
                 } else if (commands[0].equals("stopprivate")) {
                     t.cancel();
                 } else sendClientMessage("0Command \"" + commands[0] + "\" does not exist, enter \"help\" to list all supported commands.\n");
-                    
-           
             }
         }
 
@@ -442,8 +413,10 @@ public class TCPServer {
             // set the messaging mode to answerMode
             answerMode = true;
             System.out.println("try to send invitation");
+
             // send the confirmation/invitation
             sendClientMessage("3System: " + username + " wants to have a private chat with you. Do you accept?(y/n): ");
+
             // wait for user to give the answer
             while (answer == null) {
                 System.out.println("waiting for acception");
@@ -510,8 +483,6 @@ public class TCPServer {
             // log out the user/account
             userAccount.logout();
             onlineThreads.remove(userAccount.getUsername());
-            //listenerChecklist.remove(clientPort);
-            //stopListener();
             broadCast(userAccount, "System: " + userAccount.getUsername() + " has logged out.\n");
         }
 
@@ -530,13 +501,6 @@ public class TCPServer {
         public int getClientPort() {
             return clientPort;
         }
-        /*public void setSender(ClientThread s) {
-            msgSender = s;
-        }
-
-        public void stopListener() {
-            sendMessage("1");
-        }*/
 
         public Timer startTimer() {
             TimerTask task = new TimerTask() {
@@ -544,21 +508,15 @@ public class TCPServer {
                 public void run() {
                     System.out.println("[recv] logout request from user - " + clientID);
                     // log out the user/account
-                    //listenerChecklist.remove(clientPort);
                     sendClientMessage("1Timeout, exiting client...\n");
                     clientExit();
-                    
                 }
             };
-
             Timer activeTimer = new Timer(true);
-            
             activeTimer.schedule(task, inactiveThres * 1000);
-
             return activeTimer;
         }
     }
-
 
     public static void main(String[] args) throws IOException {
         if (args.length != 3) {
@@ -582,6 +540,7 @@ public class TCPServer {
         yellowBook = new ConcurrentHashMap<>();
         onlineThreads = new ConcurrentHashMap<>();
         memo = new ConcurrentHashMap<>();
+        
         //listenerChecklist = new ConcurrentHashMap<>();
         File credential = new File("Server/credentials.txt");
         Scanner myScanner = new Scanner(credential);

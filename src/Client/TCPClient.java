@@ -1,11 +1,7 @@
 /*
- * Java socket programming client example with TCP
- * socket programming at the client side, which provides example of how to define client socket, how to send message to
- * the server and get response from the server with DataInputStream and DataOutputStream
- *
- * Author: Wei Song
- * Date: 2021-09-28
- * */
+ * Author: Shaoqian Zhou
+ * Date: Oct 2021
+ */
 
 package Client;
 import java.net.*;
@@ -36,11 +32,8 @@ public class TCPClient {
         private DataInputStream dataInputStream;
         private Boolean serverListener;
         private String userListento;
-        //private DataOutputStream dataOutputStream;
 
         MessageListener(DataInputStream in, Boolean server, String name) {
-            //identityPort = idPort;
-            //messageSocket = new Socket(host, port);
             serverListener = server;
             dataInputStream = in;
             if (!serverListener) userListento = name;
@@ -49,32 +42,6 @@ public class TCPClient {
         @Override
         public void run() {
             super.run();
-            /*try {
-                dataInputStream = new DataInputStream(messageSocket.getInputStream());
-                dataOutputStream = new DataOutputStream(messageSocket.getOutputStream());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }*/
-
-
-            // send the server the port number of the client main thread port for authentication
-           /* try {
-                dataOutputStream.writeUTF("listen " + String.valueOf(identityPort));
-                dataOutputStream.flush();
-                // test the message sender
-                String message = (String) dataInputStream.readUTF();
-                assert message.equals("connected");
-                listenerConnected = true;
-                System.out.println(listenerConnected);
-
-            } catch (EOFException e) {
-                System.out.println("===== Server is down, MessageListener is terminated. =====");
-                return;
-            } catch (IOException e) {
-                System.out.println("===== Server is down, MessageListener is terminated. =====");
-                return;
-            }*/
-
             while (true) {
                 try {
                     String message = (String) dataInputStream.readUTF();
@@ -93,7 +60,7 @@ public class TCPClient {
                         String host = segments[3];
                         int port = Integer.parseInt(segments[4]);
                         String targetUsername = segments[2];  // name of the target user (that this user is calling)
-                        System.out.print("System" + targetUsername + "has accepted the private chat. Establishing connection...\n");
+                        System.out.print("System: " + targetUsername + "has accepted the private chat. Establishing connection...\n");
                         userName = segments[1];
                         Socket privateSocket = new Socket(host, port);
                         // create input stream for this socket
@@ -155,8 +122,6 @@ public class TCPClient {
                     break;
                 }
             }
-
-           
         }
     }
 
@@ -180,38 +145,14 @@ public class TCPClient {
         dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
         listener = new MessageListener(dataInputStream, true, null);
         listener.start();
-        // first wait the listener to finish connecting with the server
-
 
         // Upon connection and setup, prompt user to login by first sending a login request to the server
         sendServerMessage("login");
-
 
         // define a BufferedReader to get input from command line i.e., standard input from keyboard
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 
         while (!serverDown) {
-            //String responseMessage = (String) dataInputStream.readUTF();
-            //Character status = responseMessage.charAt(0);
-
-            // print the msg without the command byte
-            /*System.out.print(responseMessage.substring(1));
-            if (status == '0') {
-                if (listener == null) {
-                    listener = new MessageListener(clientSocket.getLocalPort());
-                    listener.start();
-                }
-
-            } 
-            // case '1': read stdin
-            else if (status == '1') {
-                String message = reader.readLine();
-                sendServerMessage(message);
-            } 
-            // case '2': exit the client
-            else if (status == '2') {
-                return;
-            }*/
             String message = reader.readLine();
 
             // if the command is to send private message, then no need to pass the request to server as server should not know the content of the chat
@@ -265,32 +206,6 @@ public class TCPClient {
             // reset to command mode
             answerMode = false;
         }
-
-        /*
-        // finish login, begin to accept request
-        while (true) {
-            System.out.println("===== Please input any message you want to send to the server: ");
-
-            // read input from command line
-            String message = reader.readLine();
-
-            // write message into dataOutputStream and send/flush to the server
-            dataOutputStream.writeUTF(message);
-            dataOutputStream.flush();
-            // receive the server response from dataInputStream
-            String responseMessage = (String) dataInputStream.readUTF();
-            System.out.println("[recv] " + responseMessage);
-
-            System.out.println("Do you want to continue(y/n) :");
-            String answer = reader.readLine();
-            if (answer.equals("n")) {
-                System.out.println("Good bye");
-                clientSocket.close();
-                dataOutputStream.close();
-                dataInputStream.close();
-                break;
-            }
-        }*/
     }
 
     private static void sendServerMessage(String message) {
